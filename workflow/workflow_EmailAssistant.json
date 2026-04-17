@@ -1,0 +1,280 @@
+{
+  "name": "IaEmail_Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const labels = (item.json.labels || []).map(label => label.name);\n\n  return !labels.includes(\"PROCESSED_AI\");\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [352,144],
+      "name": "Remove mensagens já analisadas"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const email = item.json;\n  let text = email.snippet || \"\";\n  return {\n    json: {\n      id: email.id,\n      from: email.From,\n      subject: email.Subject,\n      text: text,\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [528,144],
+      "name": "formata dados das mensagens"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [176,96],
+      "name": "Busca as dez ultimas mensagens"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": ["Label_6668027004043354001"]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1136,224],
+      "name": "Add marcador"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let content = item.json.choices[0].message.content;\n  content = content.replace(/```json|```/g, \"\").trim();\n  const parsed = JSON.parse(content);\n  return {\n    json: {\n      id: parsed.id,\n      subject: parsed.subject,\n      from: parsed.from,\n      resumo: parsed.resumo,\n      acao: parsed.acao\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [944,96],
+      "name": "Formata dados da API"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer {{$env.GROQ_API_KEY}}\",\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "jsonBody": "={ \"model\": \"llama-3.3-70b-versatile\" }"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [784,96],
+      "name": "Groq API"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "triggerAtHour": 7 }]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [16,96],
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "notificar",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Notificacao"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "responder",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Responder"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1120,-96],
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": \"📩 Novo email importante!\\n\\nAssunto: {{$json.subject}}\\nDe: {{$json.from}}\\n\\nResumo:\\n{{$json.resumo}}\"\n}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1328,-256],
+      "name": "Mensagem telegram - notificacao"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Remove mensagens já analisadas": {
+      "main": [
+        [
+          {
+            "node": "formata dados das mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "formata dados das mensagens": {
+      "main": [
+        [
+          {
+            "node": "Groq API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca as dez ultimas mensagens": {
+      "main": [
+        [
+          {
+            "node": "Remove mensagens já analisadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add marcador": {
+      "main": [
+        []
+      ]
+    },
+    "Formata dados da API": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add marcador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq API": {
+      "main": [
+        [
+          {
+            "node": "Formata dados da API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Busca as dez ultimas mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Mensagem telegram - notificacao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensagem telegram - responder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mensagem telegram - agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem telegram - notificacao": {
+      "main": [
+        []
+      ]
+    },
+    "Delete a message": {
+      "main": [
+        []
+      ]
+    },
+    "Create an event": {
+      "main": [
+        []
+      ]
+    },
+    "Mensagem telegram - agendamento": {
+      "main": [
+        []
+      ]
+    },
+    "Mensagem telegram - responder": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b20e72ce-0243-4ed6-89d8-8a38f18e2e19",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5725360c5c1228904c2c37544a469bc1e9725213e7453d48b97b7b3e273053f2"
+  },
+  "id": "9hat9HQ9IaQewNJa",
+  "tags": []
+}
