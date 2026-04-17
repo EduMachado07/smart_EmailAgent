@@ -129,11 +129,17 @@ PROCESSED_AI
 
 ## Demonstração
 
-> Adicione aqui:
+> Fluxo no n8n
 
-* Fluxo no n8n
-* Mensagem no Telegram
-* Evento criado no Google Calendar
+![Preview-Screens](https://github.com/EduMachado07/smart_EmailAgent/blob/main/assets/exampleN8N.png)
+
+> Mensagem no Telegram
+
+![Preview-Screens](https://github.com/EduMachado07/smart_EmailAgent/blob/main/assets/exampleTelegram.png)
+
+> Evento criado no Google Calendar
+
+![Preview-Screens](https://github.com/EduMachado07/smart_EmailAgent/blob/main/assets/exampleCalendar.png)
 
 ## 📌 Conclusão
 
